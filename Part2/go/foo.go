@@ -13,7 +13,7 @@ const (
 	Exit
 )
 
-func number_server(add_number <-chan int, control <-chan int, number chan<- int) {
+func number_server(add_number <-chan int, control <-chan int, number chan<- int, finished chan<- bool) {
 	var i = 0
 
 	// This for-select pattern is one you will become familiar with if you're using go "correctly".
@@ -21,6 +21,19 @@ func number_server(add_number <-chan int, control <-chan int, number chan<- int)
 		select {
 			// TODO: receive different messages and handle them correctly
 			// You will at least need to update the number and handle control signals.
+			case j := <- add_number:
+				i = i + j
+			case incoming_ctrl_signal:= <-control:
+				if incoming_ctrl_signal == GetNumber {
+					number <- i
+				} else if incoming_ctrl_signal == Exit {
+					Println("Exiting program")
+					finished <- true
+				}
+
+
+
+	
 		}
 	}
 }
@@ -30,6 +43,8 @@ func incrementing(add_number chan<-int, finished chan<- bool) {
 		add_number <- 1
 	}
 	//TODO: signal that the goroutine is finished
+	finished <- true
+
 }
 
 func decrementing(add_number chan<- int, finished chan<- bool) {
@@ -37,6 +52,7 @@ func decrementing(add_number chan<- int, finished chan<- bool) {
 		add_number <- -1
 	}
 	//TODO: signal that the goroutine is finished
+	finished <- true
 }
 
 func main() {
@@ -44,12 +60,22 @@ func main() {
 
 	// TODO: Construct the required channels
 	// Think about wether the receptions of the number should be unbuffered, or buffered with a fixed queue size.
+	add_number := make(chan int)
+	number := make(chan int)
+	control := make(chan int)
+	finished := make(chan bool)
 
 	// TODO: Spawn the required goroutines
+	go incrementing(add_number, finished)
+	go decrementing(add_number, finished)
+	go number_server(add_number, control, number, finished)
 
 	// TODO: block on finished from both "worker" goroutines
+	<-finished
+	<-finished
 
 	control<-GetNumber
 	Println("The magic number is:", <- number)
 	control<-Exit
+	<-finished
 }
